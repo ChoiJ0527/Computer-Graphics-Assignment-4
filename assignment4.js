@@ -38,13 +38,28 @@ export class Assignment4 extends Scene {
                 ambient: 0.5, diffusivity: 0.1, specularity: 0.1,
                 texture: new Texture("assets/stars.png")
             }),
+            stars: new Material(new Texture_Rotate(), {
+                color: color(0, 0, 0, 1),
+                ambient: 1,
+                texture: new Texture("assets/stars.png", "NEAREST")
+            }),
+            earth: new Material(new Texture_Scroll_X(), {
+                color: color(0, 0, 0, 1),
+                ambient: 1,
+                texture: new Texture("assets/earth.gif", "LINEAR_MIPMAP_LINEAR")
+            }),
         }
 
         this.initial_camera_location = Mat4.look_at(vec3(0, 10, 20), vec3(0, 0, 0), vec3(0, 1, 0));
+
+        this.box_1_transform = Mat4.identity().times(Mat4.translation(-2, 0, 0));
+        this.box_2_transform = Mat4.identity().times(Mat4.translation(2, 0, 0));
     }
 
     make_control_panel() {
         // TODO:  Implement requirement #5 using a key_triggered_button that responds to the 'c' key.
+
+        this.key_triggered_button("Cube rotation", ["c"], () => this.rotate = !this.rotate);
     }
 
     display(context, program_state) {
@@ -65,7 +80,20 @@ export class Assignment4 extends Scene {
 
         // TODO:  Draw the required boxes. Also update their stored matrices.
         // You can remove the folloeing line.
-        this.shapes.axis.draw(context, program_state, model_transform, this.materials.phong.override({color: hex_color("#ffff00")}));
+        
+        if (this.rotate) {
+            this.box_1_transform = this.box_1_transform.times(Mat4.rotation((2/3)*Math.PI*dt, 1, 0, 0));
+            this.box_2_transform = this.box_2_transform.times(Mat4.rotation(Math.PI*dt, 0, 1, 0));
+        }
+        
+        this.shapes.box_1.draw(context, program_state, this.box_1_transform, this.materials.stars);
+        
+        // Modified from TA demo code
+        this.shapes.box_2.arrays.texture_coord.forEach(
+            (v, i, l) => l[i] = vec(v[0] * 2, v[1] * 2)
+        )
+        
+        this.shapes.box_2.draw(context, program_state, this.box_2_transform, this.materials.earth);
     }
 }
 
@@ -79,8 +107,30 @@ class Texture_Scroll_X extends Textured_Phong {
             uniform float animation_time;
             
             void main(){
+                vec2 new_tex_coord = f_tex_coord;
+                new_tex_coord.x += -2.0 * mod(animation_time, 4.0);
+                
                 // Sample the texture image in the correct place:
-                vec4 tex_color = texture2D( texture, f_tex_coord);
+                vec4 tex_color = texture2D(texture, new_tex_coord);
+                
+                // Modified from TA demo code
+                float u = mod(new_tex_coord.x, 1.0);
+                float v = mod(new_tex_coord.y, 1.0);
+                if ((u >= 0.15 && u <= 0.25) || (u >= 0.75 && u <= 0.85))
+                {
+                    if (v <= 0.85 && v >= 0.15)
+                    {
+                        tex_color = vec4(0, 0, 0, 1.0);
+                    }
+                }
+                if ((v >= 0.15 && v <= 0.25) || (v >= 0.75 && v <= 0.85))
+                {
+                    if (u <= 0.85 && u >= 0.15)
+                    {
+                        tex_color = vec4(0, 0, 0, 1.0);
+                    }
+                }
+
                 if( tex_color.w < .01 ) discard;
                                                                          // Compute an initial (ambient) color:
                 gl_FragColor = vec4( ( tex_color.xyz + shape_color.xyz ) * ambient, shape_color.w * tex_color.w ); 
@@ -99,8 +149,34 @@ class Texture_Rotate extends Textured_Phong {
             uniform sampler2D texture;
             uniform float animation_time;
             void main(){
+                vec2 rotation_vector = f_tex_coord - vec2(0.5,0.5);
+
+                float rotation = -(3.14159/2.0) * mod(animation_time , 4.0);
+                mat2 rotation_matrix = mat2(cos(rotation), sin(rotation), -1.0 * sin(rotation), cos(rotation));
+                
+                vec2 new_tex_coord = (rotation_matrix * rotation_vector) + vec2(0.5,0.5);
+                
                 // Sample the texture image in the correct place:
-                vec4 tex_color = texture2D( texture, f_tex_coord );
+                vec4 tex_color = texture2D( texture, new_tex_coord);
+                
+                // Modified from TA demo code
+                float u = mod(new_tex_coord.x, 1.0);
+                float v = mod(new_tex_coord.y, 1.0);
+                if ((u >= 0.15 && u <= 0.25) || (u >= 0.75 && u <= 0.85))
+                {
+                    if (v <= 0.85 && v >= 0.15)
+                    {
+                        tex_color = vec4(0, 0, 0, 1.0);
+                    }
+                }
+                if ((v >= 0.15 && v <= 0.25) || (v >= 0.75 && v <= 0.85))
+                {
+                    if (u <= 0.85 && u >= 0.15)
+                    {
+                        tex_color = vec4(0, 0, 0, 1.0);
+                    }
+                }
+
                 if( tex_color.w < .01 ) discard;
                                                                          // Compute an initial (ambient) color:
                 gl_FragColor = vec4( ( tex_color.xyz + shape_color.xyz ) * ambient, shape_color.w * tex_color.w ); 
@@ -109,4 +185,3 @@ class Texture_Rotate extends Textured_Phong {
         } `;
     }
 }
-
